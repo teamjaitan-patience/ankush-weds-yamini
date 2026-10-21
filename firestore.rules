@@ -1,0 +1,23 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Wishes collection for Ankush & Yamini's Wedding Guestbook
+    match /wishes/{wishId} {
+      // Anyone visiting the wedding website can read heartfelt blessings
+      allow read: if true;
+
+      // Anyone can submit a respectful wish with valid author and text
+      allow create: if request.resource.data.author is string
+                    && request.resource.data.author.size() > 0
+                    && request.resource.data.author.size() <= 80
+                    && request.resource.data.message is string
+                    && request.resource.data.message.size() > 0
+                    && request.resource.data.message.size() <= 1000
+                    && request.resource.data.createdAt is timestamp;
+
+      // Deletions / edits are reserved for authenticated admin or Firebase Console
+      allow update, delete: if request.auth != null;
+    }
+  }
+}
