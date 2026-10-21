@@ -2,6 +2,7 @@
  * Wedding Background Music Controller
  * Song: "Ranjheya Ve" by Zain Zohaib
  */
+import audioUrl from '../assets/ranjheya-ve.mp3';
 
 class WeddingSongAudio {
   constructor(audioSrc) {
@@ -105,4 +106,4 @@ class WeddingSongAudio {
   }
 }
 
-window.weddingAudio = new WeddingSongAudio('assets/ranjheya-ve.mp3');
+window.weddingAudio = new WeddingSongAudio(audioUrl || 'assets/ranjheya-ve.mp3');
