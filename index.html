@@ -841,6 +841,37 @@
       </div>
     </dialog>
 
+    <!-- Admin Wishes Moderation Dialog -->
+    <dialog class="review-dialog" id="review-dialog">
+      <div class="review-dialog-shell">
+        <div class="review-dialog-header">
+          <div>
+            <span class="review-badge">SECRET ADMIN</span>
+            <h3>Wishes & Blessings Moderation</h3>
+            <p>Review and approve heartfelt wishes before they go live on the public website.</p>
+          </div>
+          <button type="button" class="review-close-btn" id="review-close-btn" aria-label="Close">✕</button>
+        </div>
+
+        <div class="review-tabs">
+          <button type="button" class="review-tab-btn is-active" id="tab-pending-btn">
+            Pending Approval (<span id="pending-badge-count">0</span>)
+          </button>
+          <button type="button" class="review-tab-btn" id="tab-approved-btn">
+            Live on Website (<span id="approved-badge-count">0</span>)
+          </button>
+        </div>
+
+        <div class="review-list" id="review-pending-list">
+          <!-- Pending wishes rendered via JS -->
+        </div>
+
+        <div class="review-list" id="review-approved-list" style="display: none;">
+          <!-- Approved wishes rendered via JS -->
+        </div>
+      </div>
+    </dialog>
+
     <!-- Scripts -->
     <script type="module" src="js/main.js"></script>
   </body>

@@ -6,7 +6,10 @@
 import './audio.js';
 import {
   subscribeToWishes,
+  subscribeToPendingWishes,
+  subscribeToApprovedWishes,
   submitWish,
+  approveWish,
   deleteWish,
   isFirebaseConfigured
 } from './firebase-config.js';
@@ -409,43 +412,22 @@ function initWishesWall() {
   const remainingCountEl = document.getElementById('wishes-remaining-count');
   const eyebrowEl = document.querySelector('.wishes-section .eyebrow');
 
+  // Moderation Dialog elements
+  const reviewDialog = document.getElementById('review-dialog');
+  const reviewCloseBtn = document.getElementById('review-close-btn');
+  const tabPendingBtn = document.getElementById('tab-pending-btn');
+  const tabApprovedBtn = document.getElementById('tab-approved-btn');
+  const reviewPendingList = document.getElementById('review-pending-list');
+  const reviewApprovedList = document.getElementById('review-approved-list');
+  const pendingBadgeCount = document.getElementById('pending-badge-count');
+  const approvedBadgeCount = document.getElementById('approved-badge-count');
+
   if (!listEl) return;
 
   const PAGE_SIZE = 6;
   let currentLimit = PAGE_SIZE;
-  let allWishes = [];
-
-  // Admin Mode activation via ?admin=1 or 5 taps on eyebrow
-  let tapCount = 0;
-  let tapTimer = null;
-  const enableAdmin = () => {
-    const pin = prompt('Enter Admin Passcode for Wish Moderation:');
-    if (pin === '2027' || pin === 'admin') {
-      document.body.classList.add('admin-mode');
-      localStorage.setItem('ay_admin_active', '1');
-      alert('Admin moderation mode enabled! You can now remove unwanted wishes directly with the red trash button.');
-      renderWishes();
-    } else if (pin !== null) {
-      alert('Incorrect passcode.');
-    }
-  };
-
-  if (window.location.search.includes('admin=1') || localStorage.getItem('ay_admin_active') === '1') {
-    document.body.classList.add('admin-mode');
-  }
-
-  if (eyebrowEl) {
-    eyebrowEl.style.cursor = 'pointer';
-    eyebrowEl.addEventListener('click', () => {
-      tapCount++;
-      clearTimeout(tapTimer);
-      tapTimer = setTimeout(() => { tapCount = 0; }, 1500);
-      if (tapCount >= 5) {
-        tapCount = 0;
-        enableAdmin();
-      }
-    });
-  }
+  let allApprovedWishes = [];
+  let pendingWishesList = [];
 
   function escapeHtml(str) {
     return String(str || '').replace(/[&<>"']/g, m => ({
@@ -453,8 +435,9 @@ function initWishesWall() {
     })[m]);
   }
 
-  function renderWishes() {
-    const visibleWishes = allWishes.slice(0, currentLimit);
+  /* ---------------- Public Wishes Wall (Only Approved Wishes) ---------------- */
+  function renderPublicWishes() {
+    const visibleWishes = allApprovedWishes.slice(0, currentLimit);
 
     if (visibleWishes.length === 0) {
       listEl.innerHTML = `
@@ -479,20 +462,20 @@ function initWishesWall() {
       `).join('');
     }
 
-    // Attach delete listeners
+    // Attach inline delete listeners (active in admin mode)
     listEl.querySelectorAll('.wish-delete-btn').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const id = btn.getAttribute('data-delete-id');
         if (!id) return;
-        if (confirm('Are you sure you want to remove this wish? It will be permanently removed from all screens.')) {
+        if (confirm('Are you sure you want to remove this wish? It will be removed from all screens.')) {
           try {
             btn.textContent = 'Removing...';
             btn.disabled = true;
             await deleteWish(id);
           } catch (err) {
             console.error('Failed to delete wish:', err);
-            alert('Failed to remove wish: ' + (err.message || 'Permission denied'));
+            alert('Failed to remove wish: ' + (err.message || 'Error'));
             btn.textContent = '🗑️ Remove';
             btn.disabled = false;
           }
@@ -502,7 +485,7 @@ function initWishesWall() {
 
     // Update Counter
     if (counterEl) {
-      const count = allWishes.length;
+      const count = allApprovedWishes.length;
       counterEl.textContent = count === 0
         ? 'Be the first to leave a blessing ✨'
         : (count === 1 ? '1 Heartfelt Blessing' : `${count} Heartfelt Blessings`);
@@ -510,7 +493,7 @@ function initWishesWall() {
 
     // Update Load More Button
     if (loadMoreBtn) {
-      const remaining = allWishes.length - currentLimit;
+      const remaining = allApprovedWishes.length - currentLimit;
       if (remaining > 0) {
         loadMoreBtn.style.display = 'inline-flex';
         if (remainingCountEl) {
@@ -526,25 +509,221 @@ function initWishesWall() {
   if (loadMoreBtn) {
     loadMoreBtn.addEventListener('click', () => {
       currentLimit += PAGE_SIZE;
-      renderWishes();
+      renderPublicWishes();
     });
   }
 
-  // Subscribe to real-time updates from Firebase
+  /* ---------------- Real-time Listeners ---------------- */
+
+  // Public listener: only receives APPROVED wishes!
   subscribeToWishes(
-    (wishesList) => {
-      // Merge live wishes with honorary family wishes (without duplicate IDs)
-      const existingIds = new Set(wishesList.map(w => w.id));
+    (approvedList) => {
+      const existingIds = new Set(approvedList.map(w => w.id));
       const filteredHonorary = HONORARY_WISHES.filter(hw => !existingIds.has(hw.id));
-      allWishes = [...wishesList, ...filteredHonorary];
-      renderWishes();
+      allApprovedWishes = [...approvedList, ...filteredHonorary];
+      renderPublicWishes();
+      renderApprovedReviewList(allApprovedWishes);
     },
     (err) => {
-      console.warn('Real-time sync error, displaying local/honorary blessings:', err);
+      console.warn('Real-time sync error:', err);
     }
   );
 
-  // Form submission
+  // Admin listener: receives PENDING wishes for approval
+  subscribeToPendingWishes(
+    (pendingList) => {
+      pendingWishesList = pendingList;
+      renderPendingReviewList(pendingWishesList);
+    },
+    (err) => {
+      console.warn('Pending wishes listener error:', err);
+    }
+  );
+
+  /* ---------------- Admin Review Moderation Modal ---------------- */
+  function checkAdminAuth(callback) {
+    if (localStorage.getItem('ay_admin_authenticated') === 'true') {
+      callback();
+      return;
+    }
+    const pin = prompt('Enter Secret Passcode to Review Wishes:');
+    if (pin === '2027' || pin === 'admin') {
+      localStorage.setItem('ay_admin_authenticated', 'true');
+      document.body.classList.add('admin-mode');
+      callback();
+    } else if (pin !== null) {
+      alert('Incorrect passcode.');
+    }
+  }
+
+  function openReviewModal() {
+    if (!reviewDialog) return;
+    checkAdminAuth(() => {
+      reviewDialog.showModal();
+    });
+  }
+
+  // Auto-open if ?review=true or ?admin=1 is in URL
+  if (window.location.search.includes('review=') || window.location.search.includes('admin=')) {
+    setTimeout(() => openReviewModal(), 500);
+  }
+
+  // Eyebrow 5-tap trigger
+  let tapCount = 0;
+  let tapTimer = null;
+  if (eyebrowEl) {
+    eyebrowEl.style.cursor = 'pointer';
+    eyebrowEl.title = 'Moderation access';
+    eyebrowEl.addEventListener('click', () => {
+      tapCount++;
+      clearTimeout(tapTimer);
+      tapTimer = setTimeout(() => { tapCount = 0; }, 1500);
+      if (tapCount >= 5) {
+        tapCount = 0;
+        openReviewModal();
+      }
+    });
+  }
+
+  // Close review dialog
+  if (reviewCloseBtn && reviewDialog) {
+    reviewCloseBtn.addEventListener('click', () => reviewDialog.close());
+    reviewDialog.addEventListener('click', (e) => {
+      if (e.target === reviewDialog) reviewDialog.close();
+    });
+  }
+
+  // Tab switching in review modal
+  if (tabPendingBtn && tabApprovedBtn) {
+    tabPendingBtn.addEventListener('click', () => {
+      tabPendingBtn.classList.add('is-active');
+      tabApprovedBtn.classList.remove('is-active');
+      if (reviewPendingList) reviewPendingList.style.display = 'flex';
+      if (reviewApprovedList) reviewApprovedList.style.display = 'none';
+    });
+
+    tabApprovedBtn.addEventListener('click', () => {
+      tabApprovedBtn.classList.add('is-active');
+      tabPendingBtn.classList.remove('is-active');
+      if (reviewApprovedList) reviewApprovedList.style.display = 'flex';
+      if (reviewPendingList) reviewPendingList.style.display = 'none';
+    });
+  }
+
+  function renderPendingReviewList(pendingWishes) {
+    if (pendingBadgeCount) pendingBadgeCount.textContent = pendingWishes.length;
+    if (!reviewPendingList) return;
+
+    if (pendingWishes.length === 0) {
+      reviewPendingList.innerHTML = `
+        <div class="wishes-empty-state">
+          <p>✨ No pending wishes. All wishes have been reviewed!</p>
+        </div>
+      `;
+      return;
+    }
+
+    reviewPendingList.innerHTML = pendingWishes.map(w => `
+      <article class="review-card">
+        <div class="review-card-header">
+          <h4 class="review-card-author">${escapeHtml(w.author)}</h4>
+          <span class="review-card-time">${escapeHtml(w.time || 'Pending Review')}</span>
+        </div>
+        <p class="review-card-text">${escapeHtml(w.message)}</p>
+        <div class="review-actions">
+          <button type="button" class="btn-approve" data-approve-id="${escapeHtml(w.id)}">
+            <span>✅ Approve & Publish</span>
+          </button>
+          <button type="button" class="btn-reject" data-reject-id="${escapeHtml(w.id)}">
+            <span>❌ Decline</span>
+          </button>
+        </div>
+      </article>
+    `).join('');
+
+    // Attach approve listeners
+    reviewPendingList.querySelectorAll('[data-approve-id]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-approve-id');
+        btn.disabled = true;
+        btn.innerHTML = '<span>Publishing...</span>';
+        try {
+          await approveWish(id);
+        } catch (err) {
+          console.error('Failed to approve wish:', err);
+          alert('Could not approve wish: ' + (err.message || 'Error'));
+          btn.disabled = false;
+          btn.innerHTML = '<span>✅ Approve & Publish</span>';
+        }
+      });
+    });
+
+    // Attach reject listeners
+    reviewPendingList.querySelectorAll('[data-reject-id]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-reject-id');
+        if (confirm('Decline and permanently remove this wish?')) {
+          btn.disabled = true;
+          btn.innerHTML = '<span>Removing...</span>';
+          try {
+            await deleteWish(id);
+          } catch (err) {
+            console.error('Failed to decline wish:', err);
+            btn.disabled = false;
+            btn.innerHTML = '<span>❌ Decline</span>';
+          }
+        }
+      });
+    });
+  }
+
+  function renderApprovedReviewList(approvedWishes) {
+    if (approvedBadgeCount) approvedBadgeCount.textContent = approvedWishes.length;
+    if (!reviewApprovedList) return;
+
+    if (approvedWishes.length === 0) {
+      reviewApprovedList.innerHTML = `
+        <div class="wishes-empty-state">
+          <p>No published wishes yet.</p>
+        </div>
+      `;
+      return;
+    }
+
+    reviewApprovedList.innerHTML = approvedWishes.map(w => `
+      <article class="review-card">
+        <div class="review-card-header">
+          <h4 class="review-card-author">${escapeHtml(w.author)}</h4>
+          <span class="review-card-time">${escapeHtml(w.time || 'Live')}</span>
+        </div>
+        <p class="review-card-text">${escapeHtml(w.message)}</p>
+        <div class="review-actions">
+          <button type="button" class="btn-reject" data-unpublish-id="${escapeHtml(w.id)}">
+            <span>🗑️ Remove from Live Site</span>
+          </button>
+        </div>
+      </article>
+    `).join('');
+
+    reviewApprovedList.querySelectorAll('[data-unpublish-id]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-unpublish-id');
+        if (confirm('Remove this wish from the live website?')) {
+          btn.disabled = true;
+          btn.innerHTML = '<span>Removing...</span>';
+          try {
+            await deleteWish(id);
+          } catch (err) {
+            console.error('Failed to remove wish:', err);
+            btn.disabled = false;
+            btn.innerHTML = '<span>🗑️ Remove from Live Site</span>';
+          }
+        }
+      });
+    });
+  }
+
+  /* ---------------- Form Submission ---------------- */
   if (form) {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -573,6 +752,23 @@ function initWishesWall() {
         if (submitBtn) {
           const rect = submitBtn.getBoundingClientRect();
           triggerConfetti(rect.left + rect.width / 2, rect.top);
+        }
+
+        // Show elegant confirmation note to guest
+        const formCard = form.closest('.wish-form-card');
+        if (formCard) {
+          const existingNote = formCard.querySelector('.wish-success-note');
+          if (existingNote) existingNote.remove();
+
+          const note = document.createElement('div');
+          note.className = 'wish-success-note';
+          note.innerHTML = `
+            <span class="success-icon">🕊️</span>
+            <h4>Thank You, ${escapeHtml(author)}!</h4>
+            <p>Your loving blessing has been received by Ankush & Yamini with warmth and gratitude.</p>
+          `;
+          form.insertAdjacentElement('afterend', note);
+          setTimeout(() => { note.remove(); }, 12000);
         }
       } catch (err) {
         console.error('Failed to submit wish:', err);
