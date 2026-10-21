@@ -399,26 +399,7 @@ function initGalleryLightbox() {
 /* ==========================================================================
    5. Wishes & Blessings Wall (Real-Time Firestore Sync)
    ========================================================================== */
-const HONORARY_WISHES = [
-  {
-    id: 'honorary_1',
-    author: "Rakesh Puri (Bobby) & Family",
-    message: "May the divine blessings of H. H. Sant Rajinder Singh Ji Maharaj illuminate your path always. Heartiest congratulations to dearest Ankush & Yamini on this auspicious journey of togetherness!",
-    time: "Family Blessing"
-  },
-  {
-    id: 'honorary_2',
-    author: "The Puri Family",
-    message: "Wishing dearest Ankush and Yamini a lifetime of blissful harmony, endless laughter, and boundless prosperity. Looking forward to celebrating this grand wedding on 28th January 2027!",
-    time: "Warm Wishes"
-  },
-  {
-    id: 'honorary_3',
-    author: "The Kohli Family",
-    message: "Sending our warmest love and countless blessings to dearest Yamini & Ankush. May every day of your married life be filled with sweet joys and radiant smiles!",
-    time: "Bride's Family"
-  }
-];
+const HONORARY_WISHES = [];
 
 function initWishesWall() {
   const listEl = document.getElementById('wishes-list');
@@ -522,7 +503,9 @@ function initWishesWall() {
     // Update Counter
     if (counterEl) {
       const count = allWishes.length;
-      counterEl.textContent = count === 1 ? '1 Heartfelt Blessing' : `${count} Heartfelt Blessings`;
+      counterEl.textContent = count === 0
+        ? 'Be the first to leave a blessing ✨'
+        : (count === 1 ? '1 Heartfelt Blessing' : `${count} Heartfelt Blessings`);
     }
 
     // Update Load More Button
