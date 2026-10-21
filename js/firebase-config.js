@@ -16,14 +16,15 @@ import {
   limit
 } from 'firebase/firestore';
 
-// Default / fallback configuration (can be updated via environment variables or directly)
+// Production Firebase configuration for Ankush & Yamini
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "REPLACE_WITH_YOUR_FIREBASE_API_KEY",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "ankush-yamini.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "ankush-yamini",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "ankush-yamini.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "000000000000",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:000000000000:web:000000000000"
+  apiKey: "AIzaSyCrMUSxzwf1zqbBVtZc4Elzh6IM-gjC18I",
+  authDomain: "ankush-weds-yamini.firebaseapp.com",
+  projectId: "ankush-weds-yamini",
+  storageBucket: "ankush-weds-yamini.firebasestorage.app",
+  messagingSenderId: "427375918403",
+  appId: "1:427375918403:web:5889cc23220628f25ac3f6",
+  measurementId: "G-R3V0PGGWXK"
 };
 
 // Check if Firebase has been configured with real credentials
