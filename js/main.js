@@ -75,23 +75,46 @@ function initFilmLoader() {
     }
   }, 120);
 
+  let isOpening = false;
   const unlockSite = () => {
-    if (loader) {
-      loader.classList.add('is-done');
-    }
-    // Reveal music button once invitation is unlocked
-    const musicBtn = document.getElementById('music-toggle-btn');
-    if (musicBtn) {
-      musicBtn.classList.add('is-visible');
-    }
-    // Start ambient background music
+    if (isOpening) return;
+    isOpening = true;
+
+    // Start ambient background music immediately on user interaction
     if (window.weddingAudio) {
       window.weddingAudio.play();
+      const musicBtn = document.getElementById('music-toggle-btn');
       if (musicBtn) {
         musicBtn.setAttribute('aria-pressed', 'true');
         musicBtn.innerHTML = '<span>⏸</span>';
       }
     }
+
+    const loaderCard = document.querySelector('.loader-inner');
+    const logoScreen = document.getElementById('loader-logo-screen');
+
+    // 1. Smoothly fade out the blessing card
+    if (loaderCard) {
+      loaderCard.classList.add('card-fade-out');
+    }
+
+    // 2. Reveal the full-screen royal logo with golden aura & title
+    if (logoScreen) {
+      logoScreen.classList.add('is-active');
+      logoScreen.removeAttribute('aria-hidden');
+    }
+
+    // 3. After 1.8s, smoothly dissolve the entire loader into the hero celebration
+    setTimeout(() => {
+      if (loader) {
+        loader.classList.add('is-done');
+      }
+      // Reveal music button once invitation is unlocked
+      const musicBtn = document.getElementById('music-toggle-btn');
+      if (musicBtn) {
+        musicBtn.classList.add('is-visible');
+      }
+    }, 1800);
   };
 
   if (enterBtn) {
@@ -843,7 +866,7 @@ function initAudioController() {
       e.stopPropagation();
     }
     const now = Date.now();
-    if (now - lastTriggerTime < 300) return;
+    if (now - lastTriggerTime < 350) return;
     lastTriggerTime = now;
 
     window.weddingAudio.toggle();
@@ -855,8 +878,9 @@ function initAudioController() {
     musicBtn.classList.add('is-visible');
   }
 
+  // Click event triggers reliably across all mobile browsers (Safari/Chrome/Firefox)
+  // without the ghost-click / duplicate-firing issues of paired touchend listeners
   musicBtn.addEventListener('click', handleToggle);
-  musicBtn.addEventListener('touchend', handleToggle, { passive: false });
 }
 
 /* ==========================================================================
