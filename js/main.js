@@ -53,6 +53,49 @@ function initFilmLoader() {
   const enterBtn = document.getElementById('loader-enter-btn');
   const track = document.getElementById('loader-track');
 
+  // Prevent browser scroll restoration and ensure starting strictly at (0, 0)
+  if ('scrollRestoration' in history) {
+    history.scrollRestoration = 'manual';
+  }
+  const snapToTop = () => {
+    const prev = document.documentElement.style.scrollBehavior;
+    document.documentElement.style.scrollBehavior = 'auto';
+    window.scrollTo(0, 0);
+    document.documentElement.style.scrollBehavior = prev;
+  };
+  snapToTop();
+
+  document.documentElement.classList.add('is-locked');
+  document.body.classList.add('is-locked');
+
+  const preventScrollEvent = (e) => {
+    if (document.body.classList.contains('is-locked')) {
+      e.preventDefault();
+    }
+  };
+  const preventScrollKeys = (e) => {
+    if (document.body.classList.contains('is-locked')) {
+      if (e.target && (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT')) {
+        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Space') {
+          return;
+        }
+      }
+      if (['ArrowUp', 'ArrowDown', 'Space', ' ', 'PageUp', 'PageDown', 'Home', 'End'].includes(e.key)) {
+        e.preventDefault();
+      }
+    }
+  };
+  const enforceScrollTop = () => {
+    if (document.body.classList.contains('is-locked') && (window.scrollY !== 0 || window.scrollX !== 0)) {
+      snapToTop();
+    }
+  };
+
+  window.addEventListener('wheel', preventScrollEvent, { passive: false });
+  window.addEventListener('touchmove', preventScrollEvent, { passive: false });
+  window.addEventListener('keydown', preventScrollKeys, { passive: false });
+  window.addEventListener('scroll', enforceScrollTop, { passive: true });
+
   let progress = 0;
   const interval = setInterval(() => {
     progress += Math.floor(Math.random() * 15) + 10;
@@ -80,6 +123,9 @@ function initFilmLoader() {
     if (isOpening) return;
     isOpening = true;
 
+    // Ensure scroll position is firmly at top
+    snapToTop();
+
     // Start ambient background music immediately on user interaction
     if (window.weddingAudio) {
       window.weddingAudio.play();
@@ -106,6 +152,15 @@ function initFilmLoader() {
 
     // 3. After 1.8s, smoothly dissolve the entire loader into the hero celebration
     setTimeout(() => {
+      // Remove scroll locking listeners so user can explore the wedding invitation
+      window.removeEventListener('wheel', preventScrollEvent);
+      window.removeEventListener('touchmove', preventScrollEvent);
+      window.removeEventListener('keydown', preventScrollKeys);
+      window.removeEventListener('scroll', enforceScrollTop);
+      document.documentElement.classList.remove('is-locked');
+      document.body.classList.remove('is-locked');
+      snapToTop();
+
       if (loader) {
         loader.classList.add('is-done');
         // Once the 0.8s CSS fade transition completes, completely remove from DOM hit-testing
