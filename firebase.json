@@ -14,11 +14,20 @@
     ],
     "headers": [
       {
-        "source": "**/*.@(jpg|jpeg|gif|png|webp|svg|mp4|mp3|woff2)",
+        "source": "**/*.@(jpg|jpeg|gif|png|webp|svg|mp4|mp3|woff2|js|css)",
         "headers": [
           {
             "key": "Cache-Control",
             "value": "max-age=31536000"
+          }
+        ]
+      },
+      {
+        "source": "**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
           }
         ]
       }

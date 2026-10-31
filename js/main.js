@@ -159,61 +159,167 @@ function initCountdownAndScratch() {
   const wrapper = canvas.parentElement;
   const resetBtn = document.getElementById('scratch-reset-btn');
   const hint = document.getElementById('scratch-hint');
+  const instruction = document.getElementById('scratch-instruction');
 
   let isScratching = false;
-  let isRevealed = false; // Always fresh on page load so user can always experience scratching
+  let isRevealed = false;
+  let lastX = null;
+  let lastY = null;
+  let scratchCheckCounter = 0;
+  let lastFoilWidth = 0;
 
   function setupFoil() {
     const rect = wrapper.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    lastFoilWidth = rect.width;
+
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
+    canvas.width = Math.floor(rect.width * dpr);
+    canvas.height = Math.floor(rect.height * dpr);
+    canvas.style.width = `${rect.width}px`;
+    canvas.style.height = `${rect.height}px`;
+
     ctx.scale(dpr, dpr);
     ctx.globalCompositeOperation = 'source-over';
 
-    // Paint antique gold & sage green gradient foil
+    // Paint antique gold gradient foil
     const grad = ctx.createLinearGradient(0, 0, rect.width, rect.height);
     grad.addColorStop(0, '#c88f36');
-    grad.addColorStop(0.5, '#e8be77');
+    grad.addColorStop(0.3, '#dfaf5d');
+    grad.addColorStop(0.6, '#f3d99d');
+    grad.addColorStop(0.85, '#d49b42');
     grad.addColorStop(1, '#a67228');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, rect.width, rect.height);
 
-    // Decorative Pattern on foil
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-    for (let i = 0; i < rect.width; i += 30) {
+    // Subtle metallic vertical pinstripes
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.18)';
+    for (let i = 0; i < rect.width; i += 24) {
       ctx.fillRect(i, 0, 1.5, rect.height);
     }
 
-    // Centered label
+    // Centered foil typography
     ctx.fillStyle = '#ffffff';
-    ctx.font = '600 14px "Cinzel", Georgia, serif';
+    ctx.font = '600 13px "Cinzel", Georgia, serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.letterSpacing = '3px';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 1;
     ctx.fillText('✧ SCRATCH TO REVEAL ✧', rect.width / 2, rect.height / 2);
+    ctx.shadowColor = 'transparent';
   }
 
   setupFoil();
+
+  // Protect against mobile scroll / address-bar collapse erasing the scratched foil
   window.addEventListener('resize', () => {
-    if (!isRevealed) setupFoil();
+    if (isRevealed) return;
+    const currentWidth = wrapper.getBoundingClientRect().width;
+    if (Math.abs(currentWidth - lastFoilWidth) > 20) {
+      setupFoil();
+    }
   });
 
-  function scratch(e) {
-    if (!isScratching || isRevealed) return;
+  function getCanvasCoords(e) {
     const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
-    const y = (e.clientY || (e.touches && e.touches[0].clientY)) - rect.top;
+    let clientX = e.clientX;
+    let clientY = e.clientY;
+    if (e.touches && e.touches.length > 0) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else if (e.changedTouches && e.changedTouches.length > 0) {
+      clientX = e.changedTouches[0].clientX;
+      clientY = e.changedTouches[0].clientY;
+    }
+    return {
+      x: (clientX ?? rect.left + rect.width / 2) - rect.left,
+      y: (clientY ?? rect.top + rect.height / 2) - rect.top,
+    };
+  }
+
+  function scratchPoint(x, y) {
+    if (isRevealed) return;
 
     ctx.globalCompositeOperation = 'destination-out';
+    ctx.lineWidth = 46;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    if (lastX !== null && lastY !== null) {
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    }
+
     ctx.beginPath();
-    ctx.arc(x, y, 26, 0, Math.PI * 2);
+    ctx.arc(x, y, 23, 0, Math.PI * 2);
     ctx.fill();
 
+    lastX = x;
+    lastY = y;
+
+    scratchCheckCounter++;
+    if (scratchCheckCounter % 6 === 0) {
+      checkClearing();
+    }
+  }
+
+  function startScratch(e) {
+    if (isRevealed) return;
+    isScratching = true;
+    const pos = getCanvasCoords(e);
+    lastX = pos.x;
+    lastY = pos.y;
+    scratchPoint(pos.x, pos.y);
+  }
+
+  function moveScratch(e) {
+    if (!isScratching || isRevealed) return;
+    if (e.cancelable) {
+      e.preventDefault();
+    }
+    const pos = getCanvasCoords(e);
+    scratchPoint(pos.x, pos.y);
+  }
+
+  function endScratch() {
+    if (!isScratching) return;
+    isScratching = false;
+    lastX = null;
+    lastY = null;
     checkClearing();
   }
 
+  function revealCountdown() {
+    if (isRevealed) return;
+    isRevealed = true;
+    isScratching = false;
+
+    canvas.style.transition = 'opacity 0.65s cubic-bezier(0.16, 1, 0.3, 1)';
+    canvas.style.opacity = '0';
+    canvas.style.pointerEvents = 'none';
+
+    setTimeout(() => {
+      canvas.style.display = 'none';
+      if (resetBtn) resetBtn.style.display = 'inline-flex';
+    }, 650);
+
+    if (hint) {
+      hint.textContent = '✨ Ready to celebrate together on 28th January 2027!';
+    }
+    if (instruction) {
+      instruction.textContent = 'Live Countdown to the Wedding Day';
+    }
+
+    const rect = canvas.getBoundingClientRect();
+    triggerConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+  }
+
   function checkClearing() {
+    if (isRevealed) return;
     try {
       const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imgData.data;
@@ -224,47 +330,73 @@ function initCountdownAndScratch() {
         if (data[i] < 128) transparentPixels++;
       }
 
-      if (transparentPixels / totalSampled > 0.4) {
-        isRevealed = true;
-        canvas.style.transition = 'opacity 0.6s ease';
-        canvas.style.opacity = '0';
-        setTimeout(() => { 
-          canvas.style.display = 'none'; 
-          if (resetBtn) resetBtn.style.display = 'inline-flex';
-        }, 600);
-
-        if (hint) hint.textContent = '✨ Ready to celebrate together on 28th January 2027!';
-
-        // Trigger joyful confetti explosion
-        const rect = canvas.getBoundingClientRect();
-        triggerConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      // Automatically reveal once ~20% has been scratched off
+      if (transparentPixels / totalSampled > 0.20) {
+        revealCountdown();
       }
-    } catch (err) {}
+    } catch (_) {
+      // Fallback if canvas context query is restricted
+      revealCountdown();
+    }
   }
 
   if (resetBtn) {
     resetBtn.addEventListener('click', () => {
       isRevealed = false;
+      isScratching = false;
+      lastX = null;
+      lastY = null;
       canvas.style.display = 'block';
+      canvas.style.pointerEvents = 'auto';
       canvas.style.transition = 'none';
       canvas.style.opacity = '1';
       setupFoil();
       resetBtn.style.display = 'none';
       if (hint) hint.textContent = '✧ Scratch the foil to reveal the live wedding countdown ✧';
+      if (instruction) instruction.textContent = 'Drag or swipe across the card to scratch';
     });
   }
 
-  // Pointer & Touch Events
-  canvas.addEventListener('mousedown', () => isScratching = true);
-  window.addEventListener('mouseup', () => isScratching = false);
-  canvas.addEventListener('mousemove', scratch);
+  // Universal Pointer Events (handles Touch, Mouse, and Stylus flawlessly)
+  canvas.addEventListener('pointerdown', (e) => {
+    try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+    startScratch(e);
+  });
+  canvas.addEventListener('pointermove', moveScratch);
+  canvas.addEventListener('pointerup', (e) => {
+    try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+    endScratch();
+  });
+  canvas.addEventListener('pointercancel', (e) => {
+    try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+    endScratch();
+  });
 
+  // Touch Events Fallback (with passive: false to prevent mobile page scrolling while scratching)
   canvas.addEventListener('touchstart', (e) => {
-    isScratching = true;
-    scratch(e);
-  }, { passive: true });
-  window.addEventListener('touchend', () => isScratching = false);
-  canvas.addEventListener('touchmove', scratch, { passive: true });
+    if (e.cancelable) e.preventDefault();
+    startScratch(e);
+  }, { passive: false });
+  canvas.addEventListener('touchmove', (e) => {
+    if (e.cancelable) e.preventDefault();
+    moveScratch(e);
+  }, { passive: false });
+  window.addEventListener('touchend', endScratch);
+  window.addEventListener('touchcancel', endScratch);
+
+  // Mouse Events Fallback
+  canvas.addEventListener('mousedown', startScratch);
+  window.addEventListener('mousemove', (e) => {
+    if (isScratching) moveScratch(e);
+  });
+  window.addEventListener('mouseup', endScratch);
+
+  // Optional tap on instruction/hint to reveal for accessibility
+  if (hint) {
+    hint.addEventListener('click', () => {
+      if (!isRevealed) revealCountdown();
+    });
+  }
 }
 
 /* ==========================================================================
@@ -866,7 +998,8 @@ function initAudioController() {
       e.stopPropagation();
     }
     const now = Date.now();
-    if (now - lastTriggerTime < 350) return;
+    // 250ms debounce window prevents double-triggering across touch + synthetic click
+    if (now - lastTriggerTime < 250) return;
     lastTriggerTime = now;
 
     window.weddingAudio.toggle();
@@ -878,8 +1011,9 @@ function initAudioController() {
     musicBtn.classList.add('is-visible');
   }
 
-  // Click event triggers reliably across all mobile browsers (Safari/Chrome/Firefox)
-  // without the ghost-click / duplicate-firing issues of paired touchend listeners
+  // Bind pointerup, touchend, and click to ensure instant response on every device & OS
+  musicBtn.addEventListener('pointerup', handleToggle);
+  musicBtn.addEventListener('touchend', handleToggle, { passive: false });
   musicBtn.addEventListener('click', handleToggle);
 }
 

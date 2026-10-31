@@ -2689,10 +2689,10 @@ body.admin-mode .wish-delete-btn {
   position: fixed;
   bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
   right: calc(1.5rem + env(safe-area-inset-right, 0px));
-  width: 50px;
-  height: 50px;
-  min-width: 50px;
-  min-height: 50px;
+  width: 54px;
+  height: 54px;
+  min-width: 54px;
+  min-height: 54px;
   border-radius: 50%;
   background: var(--green-forest);
   color: #ffffff;
@@ -2701,8 +2701,8 @@ body.admin-mode .wish-delete-btn {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  z-index: 99999;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.25);
+  z-index: 999999;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
   transition: opacity 0.5s ease, transform 0.35s ease, box-shadow 0.35s ease;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
@@ -2713,17 +2713,9 @@ body.admin-mode .wish-delete-btn {
   pointer-events: none;
 }
 
-.music-toggle-btn::after {
-  content: '';
-  position: absolute;
-  inset: -8px;
-  border-radius: 50%;
-  pointer-events: auto;
-}
-
 .music-toggle-btn span {
   pointer-events: none;
-  font-size: 1.25rem;
+  font-size: 1.35rem;
   line-height: 1;
   display: inline-flex;
   align-items: center;
@@ -3472,11 +3464,11 @@ body.admin-mode .wish-delete-btn {
   .music-toggle-btn {
     bottom: calc(1.35rem + env(safe-area-inset-bottom, 0px));
     right: calc(1.15rem + env(safe-area-inset-right, 0px));
-    width: 52px;
-    height: 52px;
-    min-width: 52px;
-    min-height: 52px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    width: 54px;
+    height: 54px;
+    min-width: 54px;
+    min-height: 54px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
   }
 }
 
