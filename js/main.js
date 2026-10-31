@@ -108,6 +108,14 @@ function initFilmLoader() {
     setTimeout(() => {
       if (loader) {
         loader.classList.add('is-done');
+        // Once the 0.8s CSS fade transition completes, completely remove from DOM hit-testing
+        setTimeout(() => {
+          loader.style.display = 'none';
+          if (logoScreen) {
+            logoScreen.classList.remove('is-active');
+            logoScreen.style.display = 'none';
+          }
+        }, 850);
       }
       // Reveal music button once invitation is unlocked
       const musicBtn = document.getElementById('music-toggle-btn');
